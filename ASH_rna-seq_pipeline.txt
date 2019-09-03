@@ -1,0 +1,51 @@
+1)Downloading and Unzipping the GRCm38 Mouse Reference Genome using wget from ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M19 
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M19/Mus_musculus.GRCm38.92.gtf.gz
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M19/Mus_musculus.GRCm38.dna.toplevel.fa.gz
+
+2)Generating Reference Genome index file from bowtie2 :
+WD : /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/index/bowtie_index/
+Command : bowtie2-build -f /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.dna.toplevel.fa Mus_musculus.GRCm38.dna.toplevel
+
+3)Perform quality control
+Command : fastqc -t 8 -o home/bilab/ashvini/RNA-SEQ_TOOLS/FASTQC/FastQC_Results *.fastq 
+
+4)If Good quality reads - Don't perform quality control
+
+5) Alignment using tophat
+WD : /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/modek_1
+Command : home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/TOPHAT/tophat-2.1.1.Linux_x86_64/tophat2 -p 4 -G /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.92.gtf /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/index/bowtie_index/Mus_musculus.GRCm38.dna.toplevel /home/bilab/ashvini/pharm_RNAseq/modek_1_1.fastq /home/bilab/ashvini/pharm_RNAseq/modek_1_2.fastqc
+
+Repeat for each sample in wd modek_2, atg7ko_1, atg7ko_2 respectively in /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1 !!
+
+6) Assem transcriptome assembly for each samples
+WD : /home/bilab/ashvini/RNA-SEQ_TOOLS/cufflink/cufflink_set1/modek_1
+Command : cufflinks -p 10 --library-type  fr-firststrand -g /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.92.gtf --multi-read-correct --frag-bias-correct /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.dna.toplevel.fa /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/modek_1/accepted_hits.bam
+ 
+Repeat for each sample in wd modek_2, atg7_ko_1, atg7_ko_2 respectively in /home/bilab/ashvini/RNA-SEQ_TOOLS/cufflink/cufflink_set1 !!
+
+7) Merge all samples' transcriptomes into one for quantification and normalization step.
+assemblies.txt is a file that contains all samples' transcripts.gtf files generated in cufflinks step. This needs to be created manually.
+
+My assemblies.txt file for the first set is :
+/home/bilab/ashvini/RNA-SEQ_TOOLS/cufflink/cufflink_set1/modek_1/transcripts.gtf
+/home/bilab/ashvini/RNA-SEQ_TOOLS/cufflink/cufflink_set1/modek_2/transcripts.gtf
+/home/bilab/ashvini/RNA-SEQ_TOOLS/cufflink/cufflink_set1/atg7_ko_1/transcripts.gtf
+/home/bilab/ashvini/RNA-SEQ_TOOLS/cufflink/cufflink_set1/atg7_ko_2/transcripts.gtf
+
+WD : /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffmerge
+Command : :- cuffmerge –g /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.92.gtf  -s /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38 –p 8 assemblies.txt
+
+8)Cuffdiff to find differentially expressed genes, isoforms,cds and tss
+WD : /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffdiff
+Command : cuffdiff -L control,case -p 10 -b /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.dna.toplevel.fa -u /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffmerge/merged_asm/merged.gtf /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/modek_1/accepted_hits.bam,/home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/modek_2/tophat_out/accepted_hits.bam /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/atg7ko_1/tophat_out/accepted_hits.bam,/home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/atg7ko_2/tophat_out/accepted_hits.bam
+
+9) Quantification for each of the samples
+WD : /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffquant/modek1
+Command : cuffquant -b /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/Ensemble_GRCm38/Mus_musculus.GRCm38.dna.toplevel.fa -p 2 --library-type=fr-unstranded /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffmerge/merged_asm/merged.gtf /home/bilab/ashvini/RNA-SEQ_TOOLS/alignment/set1/modek_1/tophat_out/accepted_hits.bam
+
+The first sample is running right now..
+
+NEXT STEP ... 
+10) Normalized expression matrix using cuffnorm 
+cuffnorm -p 4 --library-type=fr-unstranded /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffmerge/set1/merged_asm/merged.gtf /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffquant/modek1/abundances.cxb /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffquant/modek2/abundances.cxb /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffquant/atg7ko1/abundances.cxb /home/bilab/ashvini/RNA-SEQ_TOOLS/cuffquant/atg7ko2/abundances.cxb
+
